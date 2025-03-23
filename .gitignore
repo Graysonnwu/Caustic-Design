@@ -3,3 +3,5 @@ caustic_design_cli/img
 
 output.obj
 *.DS_Store
+*.dat
+*.weight

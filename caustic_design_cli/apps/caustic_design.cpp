@@ -385,8 +385,12 @@ std::vector<double> interpolate_point(Mesh &mesh, const std::vector<std::vector<
     bool intersection = false;
     mesh.source_bvh->query(point, hit, intersection);
     if (intersection) {
-        double interpolation_x = positions[mesh.triangles[hit.face_id][0]][0]*hit.barycentric_coords[0] + positions[mesh.triangles[hit.face_id][1]][0]*hit.barycentric_coords[1] + positions[mesh.triangles[hit.face_id][2]][0]*hit.barycentric_coords[2];
-        double interpolation_y = positions[mesh.triangles[hit.face_id][0]][1]*hit.barycentric_coords[0] + positions[mesh.triangles[hit.face_id][1]][1]*hit.barycentric_coords[1] + positions[mesh.triangles[hit.face_id][2]][1]*hit.barycentric_coords[2];
+        double interpolation_x = positions[mesh.triangles[hit.face_id][0]][0]*hit.barycentric_coords[0] + 
+                                 positions[mesh.triangles[hit.face_id][1]][0]*hit.barycentric_coords[1] + 
+                                 positions[mesh.triangles[hit.face_id][2]][0]*hit.barycentric_coords[2];
+        double interpolation_y = positions[mesh.triangles[hit.face_id][0]][1]*hit.barycentric_coords[0] + 
+                                 positions[mesh.triangles[hit.face_id][1]][1]*hit.barycentric_coords[1] + 
+                                 positions[mesh.triangles[hit.face_id][2]][1]*hit.barycentric_coords[2];
         triangle_miss = false;
         return {interpolation_x, interpolation_y, 0.0f};
     } else {

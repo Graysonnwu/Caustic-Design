@@ -101,3 +101,7 @@ add_library(cdesign ${CD_SRC_FILES})
 
 add_executable(caustic_design apps/caustic_design.cpp)
 target_link_libraries(caustic_design cdesign ${ALLLIBS} ${CERES_LIBRARIES} ${CGAL_LIBRARIES} lbfgs CGAL::CGAL)
+
+# 添加新的插值应用程序
+add_executable(interpolate apps/interpolate.cpp)
+target_link_libraries(interpolate cdesign ${ALLLIBS} ${CERES_LIBRARIES} ${CGAL_LIBRARIES} lbfgs CGAL::CGAL pthread)
