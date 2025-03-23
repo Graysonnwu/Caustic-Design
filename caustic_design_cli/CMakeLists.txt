@@ -49,13 +49,18 @@ include_directories(${CERES_INCLUDE_DIRS})
 find_package(CGAL REQUIRED)
 include_directories(${CGAL_INCLUDE_DIRS})
 
-FetchContent_Declare(
-    libLBFGS
-    GIT_REPOSITORY https://github.com/chokkan/liblbfgs.git
-    GIT_TAG        master  # Or use a specific commit/tag
-)
-
-FetchContent_MakeAvailable(libLBFGS)
+if(EXISTS "${PROJECT_SOURCE_DIR}/liblbfgs")
+    message(STATUS "Using local liblbfgs")
+    add_subdirectory(liblbfgs)
+else()
+    message(STATUS "Fetching liblbfgs from GitHub")
+    FetchContent_Declare(
+        libLBFGS
+        GIT_REPOSITORY https://github.com/chokkan/liblbfgs.git
+        GIT_TAG        master
+    )
+    FetchContent_MakeAvailable(libLBFGS)
+endif()
 
 #set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMake/")
 #find_package(LBFGS REQUIRED)
