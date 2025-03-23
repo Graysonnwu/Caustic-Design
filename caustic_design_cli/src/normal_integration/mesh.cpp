@@ -16,7 +16,7 @@ Mesh::Mesh(double width, double height, int res_x, int res_y)
     
     build_vertex_to_triangles();
 
-    this->source_points = circular_transform(this->source_points);
+    // this->source_points = circular_transform(this->source_points);
 }
 
 Mesh::Mesh(std::vector<std::vector<double>> new_points, std::vector<std::vector<unsigned int>> new_triangles)
@@ -152,11 +152,11 @@ void Mesh::generate_poked_mesh(int nx, int ny, double width, double height, std:
     int offset = (nx + 1) * (ny + 1);
     for (int y=0; y<ny; y++){
         for (int x=0; x<nx; x++){
-            int upper_left = x + y * (nx + 1);
-            int upper_right = (x + 1) + y * (nx + 1);
-            int lower_left = x + (y + 1) * (nx + 1);
-            int lower_right = (x + 1) + (y + 1) * (nx + 1);
-            int center = offset + x + y * (nx);
+            unsigned int upper_left = x + y * (nx + 1);
+            unsigned int upper_right = (x + 1) + y * (nx + 1);
+            unsigned int lower_left = x + (y + 1) * (nx + 1);
+            unsigned int lower_right = (x + 1) + (y + 1) * (nx + 1);
+            unsigned int center = offset + x + y * (nx);
 
             triangles.push_back({upper_left, upper_right, center});
             triangles.push_back({lower_left, upper_left, center});
@@ -466,6 +466,7 @@ double cot(const std::vector<double>& a, const std::vector<double>& b) {
     return dot(a, b) / cross_magnitude;
 }
 
+// https://en.wikipedia.org/wiki/Discrete_Laplace_operator#Mesh_Laplacians
 std::vector<double> Mesh::compute_laplacian(int i) {
     std::vector<double> laplacian(vertex_adjecent_vertices[i].size(), 0.0f);
 

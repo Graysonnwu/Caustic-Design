@@ -1,4 +1,6 @@
 #include "bvh.h"
+#include <algorithm>  // 添加算法库，支持std::nth_element和std::all_of
+#include <functional>  // 支持函数对象和lambda表达式
 
 // the implementation was heavily based on the work of Gael Guennebaud at https://github.com/ggael/otmap
 
@@ -182,12 +184,26 @@ void Bvh::buildNode(int nodeId, int start, int end, int level, int targetCellSiz
         dim = 1;
     }
 
-    // Split at the middle
-    double split_value = 0;
-    if (dim == 0) {
-        split_value = 0.5f * (nodes[nodeId].bbox_max_x + nodes[nodeId].bbox_min_x);
-    } else {
-        split_value = 0.5f * (nodes[nodeId].bbox_max_y + nodes[nodeId].bbox_min_y);
+    // 使用中位数分割而不是空间中点分割
+    std::vector<double> dim_values;
+    for (int i = start; i < end; i++) {
+        dim_values.push_back(centroids[i][dim]);
+    }
+    
+    // 找出中位数作为分割值
+    size_t mid_idx = dim_values.size() / 2;
+    std::nth_element(dim_values.begin(), dim_values.begin() + mid_idx, dim_values.end());
+    double split_value = dim_values[mid_idx];
+    
+    // 如果所有值都相同，则尝试在另一个维度上分割
+    if (std::all_of(dim_values.begin(), dim_values.end(), [split_value](double val) { return val == split_value; })) {
+        dim = 1 - dim;  // 切换维度
+        dim_values.clear();
+        for (int i = start; i < end; i++) {
+            dim_values.push_back(centroids[i][dim]);
+        }
+        std::nth_element(dim_values.begin(), dim_values.begin() + mid_idx, dim_values.end());
+        split_value = dim_values[mid_idx];
     }
 
     //std::cout << "level=" << level << " dim=" << dim << ", val=" << split_value << std::endl;

@@ -8,6 +8,10 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <iostream>
+#include <thread>
+#include <mutex>
+#include <vector>
+#include <future>
 
 #include "normal_integration/normal_integration.h"
 #include "normal_integration/mesh.h"
@@ -376,7 +380,7 @@ std::unordered_map<std::string, std::string> parse_arguments(int argc, char cons
 }
 
 // interpolate target mesh into a rectangular grid
-std::vector<double> interpolate_point(Mesh &mesh, std::vector<std::vector<double>>& positions, std::vector<double> &point, bool &triangle_miss) {
+std::vector<double> interpolate_point(Mesh &mesh, const std::vector<std::vector<double>>& positions, std::vector<double> &point, bool &triangle_miss) {
     Hit hit;
     bool intersection = false;
     mesh.source_bvh->query(point, hit, intersection);
@@ -425,6 +429,34 @@ std::vector<double> calculate_centroid_vector(std::vector<Point> vertices) {
     return centroid;
 }
 
+// 多线程插值处理函数
+void interpolate_points_range(
+    const Mesh& interpolation_mesh,
+    const std::vector<std::vector<double>>& pd_centroids,
+    const std::vector<std::vector<double>>& source_points,
+    std::vector<std::vector<double>>& target_points,
+    size_t start_idx, 
+    size_t end_idx,
+    std::mutex& print_mutex) {
+    
+    for (size_t i = start_idx; i < end_idx; ++i) {
+        if (i % 1000 == 0) {
+            std::lock_guard<std::mutex> lock(print_mutex);
+            std::cout << "thread " << std::this_thread::get_id() << " interpolation: " << i - start_idx << "/" << end_idx - start_idx << std::endl;
+        }
+        
+        bool triangle_miss = false;
+        std::vector<double> interpolated_point = interpolate_point(
+            const_cast<Mesh&>(interpolation_mesh), 
+            pd_centroids, 
+            const_cast<std::vector<double>&>(source_points[i]), 
+            triangle_miss);
+        
+        interpolated_point.push_back(0.0f); // 添加z值
+        target_points[i] = interpolated_point;
+    }
+}
+
 int main(int argc, char const *argv[])
 {
     setlocale(LC_ALL,"C");
@@ -457,22 +489,34 @@ int main(int argc, char const *argv[])
     m_scene = new Scene;
     m_scene->load_image(target_image_filename);
 
-    //Mesh mesh(1.0, 1.0/2, opts.resolution, (int)(opts.resolution/2));
-    Mesh mesh(1.0, 1.0, mesh_res, mesh_res);
-    
-    mesh.build_vertex_to_triangles();
-
-    mesh.calculate_vertex_laplacians();
-
-    normal_int.initialize_data(mesh);
-    
     OptimalTransport ot = OptimalTransport(m_scene, source_scene, n_levels, n_sites);
     ot.runOptimalTransport(false);
+
+    // add dummy points
+    std::vector<FT> o_weights;
+    std::vector<Point> o_points;
+    source_scene->collect_sites(o_points, o_weights);
+    o_points.push_back(Point(1000, 1000)); o_points.push_back(Point(-1000, 1000)); o_points.push_back(Point(1000, -1000)); o_points.push_back(Point(-1000, -1000));
+    o_weights.push_back(FT(0.0)); o_weights.push_back(FT(0.0)); o_weights.push_back(FT(0.0)); o_weights.push_back(FT(0.0));
+    source_scene->construct_triangulation(o_points, o_weights);
+    std::cout << "m_vertices.size() = " << source_scene->m_vertices.size() << std::endl;
+
+    // 输出点和权重到文件
+    if(true){
+        std::string points_filename = target_image_filename + ".dat";      std::ofstream points_file(points_filename);    points_file.precision(10);   points_file << std::fixed;
+        std::string weights_filename = target_image_filename + ".weight";  std::ofstream weights_file(weights_filename);  weights_file.precision(10);  weights_file << std::fixed;
+        for(size_t i = 0; i < o_points.size(); i++) {
+            points_file << o_points[i].x() << " " << o_points[i].y() << std::endl;
+            weights_file << o_weights[i] << std::endl;
+        }
+        points_file.close(); weights_file.close();
+        std::cout << "Points saved to: " << points_filename << std::endl;
+        std::cout << "Weights saved to: " << weights_filename << std::endl;
+    }
 
     std::vector<std::vector<double>> points;
     std::vector<std::vector<double>> pd_centroids;
     std::vector<std::vector<unsigned int>> triangles;
-    std::vector<std::vector<double>> target_points;
 
     for (auto fit = source_scene->m_rt.finite_faces_begin(); fit != source_scene->m_rt.finite_faces_end(); ++fit) {
         std::vector<unsigned int> triangle = {
@@ -503,41 +547,89 @@ int main(int argc, char const *argv[])
         pd_centroids[i][0] += 0.5;
         pd_centroids[i][1] += 0.5;
     }
+    
+    Mesh mesh(1.0, 1.0, mesh_res, mesh_res);
+    mesh.build_vertex_to_triangles();
+    mesh.calculate_vertex_laplacians();
+    normal_int.initialize_data(mesh);
 
     Mesh interpolation_mesh(points, triangles);
 
     interpolation_mesh.build_source_bvh(5, 30);
-    for (int i = 0; i < mesh.source_points.size(); i++)
-    {
-        bool triangle_miss = false;
-        target_points.push_back(interpolate_point(interpolation_mesh, pd_centroids, mesh.source_points[i], triangle_miss));
-        target_points[i].push_back(0.0f);
+    std::vector<std::vector<double>> target_points(mesh.source_points.size());
+    
+    // 计算CPU线程数量并创建线程
+    unsigned int num_threads = std::thread::hardware_concurrency();
+    // 至少使用2个线程，最多8个线程
+    num_threads = std::max(2u, std::min(8u, num_threads));
+    std::cout << "Using " << num_threads << " threads for interpolation." << std::endl;
+    
+    std::vector<std::thread> threads;
+    std::mutex print_mutex;
+    
+    // 计算每个线程处理的点数量
+    size_t points_per_thread = mesh.source_points.size() / num_threads;
+    
+    // 创建并启动线程
+    for (unsigned int t = 0; t < num_threads; ++t) {
+        size_t start_idx = t * points_per_thread;
+        size_t end_idx = (t == num_threads - 1) ? mesh.source_points.size() : (t + 1) * points_per_thread;
+        
+        threads.emplace_back(
+            interpolate_points_range,
+            std::ref(interpolation_mesh),
+            std::ref(pd_centroids),
+            std::ref(mesh.source_points),
+            std::ref(target_points),
+            start_idx,
+            end_idx,
+            std::ref(print_mutex)
+        );
+    }
+    
+    // 等待所有线程完成
+    for (auto& thread : threads) {
+        thread.join();
+    }
+    
+    std::cout << "Multi-thread interpolation done." << std::endl;
+
+    if(true){
+        std::string otmap_filename = target_image_filename + "_" + std::to_string(mesh_res) + "-otmap.dat";
+        std::ofstream outfile(otmap_filename);
+        outfile.precision(10);
+        outfile << std::fixed;
+        for(size_t i = 0; i < mesh.source_points.size(); i++) {
+            outfile << mesh.source_points[i][0] << " " << mesh.source_points[i][1] << " "<< target_points[i][0] << " " << target_points[i][1] << std::endl;
+        }
+        outfile.close();
+        std::cout << "Output points to " << otmap_filename << std::endl;
     }
   
-    //export_grid_to_svg(mesh.source_points, 1, 1, opts.resolution, opts.resolution, "../grid.svg", 0.5);
+    // //export_grid_to_svg(mesh.source_points, 1, 1, opts.resolution, opts.resolution, "../grid.svg", 0.5);
 
-    //scaleAndTranslatePoints(mesh.source_points, 1.0, 1.0, 1.0 / 100);
+    // //scaleAndTranslatePoints(mesh.source_points, 1.0, 1.0, 1.0 / 100);
     
-    for (int i=0; i<mesh.source_points.size(); i++)
-    {
-        Eigen::Vector2d point = {mesh.source_points[i][0], mesh.source_points[i][1]};
-        vertex_positions.push_back(point);
-    }
+    // for (int i=0; i<mesh.source_points.size(); i++)
+    // {
+    //     Eigen::Vector2d point = {mesh.source_points[i][0], mesh.source_points[i][1]};
+    //     vertex_positions.push_back(point);
+    // }
 
-    //export_grid_to_svg(trg_pts, 1, 0.5, opts.resolution, opts.resolution, "../grid.svg", 0.5);
+    // //export_grid_to_svg(trg_pts, 1, 0.5, opts.resolution, opts.resolution, "../grid.svg", 0.5);
 
-    std::vector<std::vector<double>> desired_normals;
+    // std::vector<std::vector<double>> desired_normals;
 
-    //scalePoints(trg_pts, {8, 8, 0}, {0.5, 0.5, 0});
-    rotatePoints(target_points, {0, 0, 0});
-    translatePoints(target_points, {0, 0, focal_l});
+    // //scalePoints(trg_pts, {8, 8, 0}, {0.5, 0.5, 0});
+    // rotatePoints(target_points, {0, 0, 0});
+    // translatePoints(target_points, {0, 0, focal_l});
 
-    for (int i=0; i<10; i++)
-    {
-        std::vector<std::vector<double>> normals = fresnelMapping(mesh.source_points, target_points, 1.49);
+    // for (int i=0; i<10; i++)
+    // {
+    //     std::vector<std::vector<double>> normals = fresnelMapping(mesh.source_points, target_points, 1.49);
 
-        normal_int.perform_normal_integration(mesh, normals);
-    }
+    //     normal_int.perform_normal_integration(mesh, normals);
+    // }
 
-    mesh.save_solid_obj_source(0.2, "output.obj");
+    // mesh.save_solid_obj_source(0.2, "output.obj");
 }
