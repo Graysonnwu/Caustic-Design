@@ -2,8 +2,11 @@
 #define _WINDOW_
 
 // Qt
+#include <QMainWindow>
 #include <QWidget>
 #include <QString>
+#include <QVector>
+#include <QAction>
 
 // local
 #include "ui_caustic.h"

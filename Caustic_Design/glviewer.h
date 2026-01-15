@@ -2,7 +2,7 @@
 #define GLWIDGET_H
 
 // Qt
-#include <QGLWidget>
+#include <QtOpenGL/QGLWidget>
 #include <QPaintEvent>
 
 //local

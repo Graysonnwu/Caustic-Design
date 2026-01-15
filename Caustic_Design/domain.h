@@ -4,7 +4,8 @@
 // Qt
 #include <QImage>
 #include <QString>
-#include <QtOpenGL>
+// OpenGL
+#include <GL/gl.h>
 
 // local
 #include "util.h"

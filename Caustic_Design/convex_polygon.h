@@ -7,8 +7,8 @@
 // CGAL
 #include <CGAL/intersections.h>
 
-// Qt
-#include <QtOpenGL>
+// OpenGL
+#include <GL/gl.h>
 
 // local
 #include "util.h"

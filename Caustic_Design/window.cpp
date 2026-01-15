@@ -4,12 +4,24 @@
 #include <sstream>
 
 // Qt
-#include <QtGui>
+#include <QApplication>
 #include <QDialog>
 #include <QActionGroup>
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QClipboard>
+#include <QMainWindow>
+#include <QMenu>
+#include <QAction>
+#include <QSettings>
+#include <QFileInfo>
+#include <QTextStream>
+#include <QUrl>
+#include <QMimeData>
+#include <QDropEvent>
+#include <QDragEnterEvent>
+#include <QCloseEvent>
+#include <QMessageBox>
 
 // local
 #include "timer.h"
@@ -85,7 +97,7 @@ void MainWindow::addToRecentFiles(QString fileName)
 
 void MainWindow::dropEvent(QDropEvent *event)
 {
-	Q_FOREACH(QUrl url, event->mimeData()->urls())
+	for(const QUrl &url : event->mimeData()->urls())
 	{
 		QString filename = url.toLocalFile();
 		if (!filename.isEmpty())

@@ -16,8 +16,7 @@ The goal of this project is to create an open source application that enables ar
 ### Dependencies:
 
 1. `sudo apt update`
-
-2. Install Qt4:
+2. Install Qt4: (Caustic_Design is now in Qt5)
 
 ```sh
 sudo apt install libqt4-dev
@@ -35,6 +34,14 @@ Then retry to install `libqt4-dev`:
 ```sh
 audo apt install libqt4-dev
 ```
+
+> [!NOTE]
+> I have upgraded Caustic_Design to Qt5, because `ppa:rock-core/qt4` is no longer maintained.
+> 
+> To install Qt5, run 
+> ```
+> sudo apt install qtbase5-dev qt5-qmake libqt5opengl5-dev
+> ```
 
 3. Install other dependencies:
 

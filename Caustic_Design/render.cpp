@@ -1,8 +1,8 @@
 // 
 #include <cmath>
 
-// Qt
-#include <QtOpenGL>
+// OpenGL
+#include <GL/gl.h>
 
 // local
 #include "ramp.h"

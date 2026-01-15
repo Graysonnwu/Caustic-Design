@@ -1,5 +1,9 @@
 // Qt
-#include <QtGui>
+#include <QtOpenGL/QGLWidget>
+#include <QtOpenGL/QGLFormat>
+#include <QWheelEvent>
+#include <QMouseEvent>
+#include <QCursor>
 
 // local
 #include "scene.h"
@@ -170,9 +174,10 @@ void GlViewer::paintGL()
 void GlViewer::wheelEvent(QWheelEvent *event) 
 {
     if (!m_scene) return;
-    m_scale += 0.05 * (event->delta() / 120);
+    int delta = event->angleDelta().y();
+    m_scale += 0.05 * (delta / 120);
     if (m_scale <= 0.0) m_scale = 0.0;
-    updateGL();
+    update();
 }
 
 void GlViewer::mousePressEvent(QMouseEvent *event) 
@@ -197,7 +202,7 @@ void GlViewer::mouseMoveEvent(QMouseEvent *event)
     }
     
     m_mouse_click = m_mouse_move;
-    updateGL();
+    update();
 }
 
 void GlViewer::mouseReleaseEvent(QMouseEvent *event) 
@@ -212,13 +217,14 @@ void GlViewer::mouseReleaseEvent(QMouseEvent *event)
     
     m_mouse_click = m_mouse_move;
     setCursor(QCursor(Qt::ArrowCursor));
-    updateGL();
+    update();
 }
 
 void GlViewer::move_camera(const QPoint& p0, const QPoint& p1)
 {
     m_center_x -= double(p1.x() - p0.x()) / double(width());
     m_center_y += double(p1.y() - p0.y()) / double(height());
+    update();
 }
 
 
