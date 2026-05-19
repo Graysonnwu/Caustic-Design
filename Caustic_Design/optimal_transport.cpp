@@ -4,6 +4,58 @@
 #include "gradientdescent.h"
 #include "dialog.h"
 
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+// Add these helper functions at the top of the file or in a suitable location
+int kbhit() {
+    struct termios oldt, newt;
+    int ch;
+    int oldf;
+    
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+    
+    ch = getchar();
+    
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fcntl(STDIN_FILENO, F_SETFL, oldf);
+    
+    if(ch != EOF) {
+        ungetc(ch, stdin);
+        return 1;
+    }
+    
+    return 0;
+}
+
+int getch() {
+    int ch;
+    struct termios oldt, newt;
+    
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    
+    ch = getchar();
+    
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    
+    return ch;
+}
+
+// 清空输入缓冲区
+void flush_input() {
+    int ch;
+    while ((ch = getchar()) != EOF && ch != '\n');
+}
+
 OptimalTransport::OptimalTransport(Scene*m_scene, Scene*source_scene, MainWindow* win, GlViewer* source_viewer, int level_max, int site_amount):
     m_scene(m_scene),
     source_scene(source_scene),
@@ -272,18 +324,18 @@ lbfgsfloatval_t OptimalTransport::evaluate(
 
     std::cout << "Eval.. step = " << step << std::endl;
     std::vector<FT> weights = std::vector<FT>(n);
-    FT min_weight = 1000;
-    FT max_weight = -1000;
+    // FT min_weight = x[0];
+    // FT max_weight = x[0];
     int i;
     for(i=0; i<n; i++)
     {
         weights[i] = x[i];
 
-        if(weights[i] < min_weight)
-            min_weight = weights[i];
+        // if(weights[i] < min_weight)
+        //     min_weight = weights[i];
 
-        if(weights[i] > max_weight)
-            max_weight = weights[i];
+        // if(weights[i] > max_weight)
+        //     max_weight = weights[i];
     }
 
     //std::cout << "min-weight = " << min_weight << ", max-weight = " << max_weight << std::endl;
@@ -291,7 +343,7 @@ lbfgsfloatval_t OptimalTransport::evaluate(
     // --- update the triangulation with the old points and the new weights
     //source_scene->update_weights(weights, false);
     //source_scene->update_triangulation();
-    scaled_scenes[current_level]->construct_triangulation(source_points, weights);
+    scaled_scenes[current_level]->construct_triangulation(source_points, weights); // output "weight sum is" and "Warning, some vertices are hidden"
     current_source_vertices = scaled_scenes[current_level]->getVertices();
     // --- update UI (can be removed for improved performance)
 
@@ -381,11 +433,29 @@ int OptimalTransport::progress(
 
     bool will_stop = norm & !hidden_vertices;
 
-    printf("Iteration %d:\n", k);
-    printf("  fx = %f, x[0] = %f, x[1] = %f\n", fx, x[0], x[1]);
-    printf("  xnorm = %f, gnorm = %f, step = %f\n", xnorm, gnorm, step);
-    printf("  hidden vertices: %d, norm reached: %s, will stop: %s", hidden_vertices_amount, norm ? "true" : "false", will_stop ? "true" : "false");
-    printf("\n");
+    // if (n >= 100000 && gnorm < 1e-4 && hidden_vertices_amount < 20 && k > 5000) {
+    //     will_stop = true;
+    // }
+    // if (n >= 200000 && gnorm < 1e-4 && hidden_vertices_amount < 50 && k > 2500) {
+    //     will_stop = true;
+    // }
+    
+    // 检测键盘输入
+    if (kbhit()) {
+        int key = getch();
+        if (key == 'k' || key == 'K') {
+            printf("\n  Manual termination requested (k key pressed)\n");
+            will_stop = true;
+            flush_input(); // 清空输入缓冲区，防止影响下一次迭代
+        }
+    }
+
+    printf("Iteration %d: (n = %d, current_level = %d)\n", k, n, current_level);
+    // printf("  fx = %f, x[0] = %f, x[1] = %f\n", fx, x[0], x[1]);
+    // printf("  xnorm = %f, gnorm = %f, step = %f\n", xnorm, gnorm, step);
+    printf("  gnorm = %f %s epsilon = %f, norm reached: %s\n", gnorm, norm ? "<" : ">", epsilon, norm ? "true" : "false");
+    printf("  hidden vertices: %d, will stop: %s\n", hidden_vertices_amount, will_stop ? "true" : "false");
+    printf("  Press k to manually terminate\n");
 
 
 

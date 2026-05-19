@@ -1,7 +1,7 @@
-cmake_minimum_required( VERSION 2.6 )
+cmake_minimum_required( VERSION 3.1 )
 set ( CMAKE_BUILD_TYPE Release )
 #add_definitions ( -Wall )
-find_package ( Qt4 REQUIRED )
+find_package ( Qt5 REQUIRED COMPONENTS Core Gui OpenGL Widgets )
 
 find_package(OpenGL REQUIRED)
 include_directories(${OpenGL_INCLUDE_DIRS})
@@ -28,13 +28,12 @@ FIND_PACKAGE(SUITESPARSE REQUIRED)
 FIND_PACKAGE(TinyXML REQUIRED)
 
 
-set(QT_USE_QTOPENGL TRUE)
 set ( CGAL_FLAGS "-lCGAL -lboost_thread -lgmp -lmpfr -lm -lamd -lcamd -lcolamd -lccolamd -lcholmod -lspqr -ltbb -lmetis -lblas -llapack" )
 set (CMAKE_CXX_FLAGS "-frounding-math -pthread -O3 -std=c++11 ${CGAL_FLAGS}")
-include ( ${QT_USE_FILE} )
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include_directories (
 	${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}
-	${QT_QTCORE_INCLUDE_DIR} ${QT_QTGUI_INCLUDE_DIR} ${QT_QTOPENGL_INCLUDE_DIR}
 	${OPENGL_INCLUDE_DIR}
 	${LBFGS_INCLUDE_DIRS}
 	${SUITESPARSE_INCLUDE_DIRS}
@@ -93,15 +92,25 @@ set ( Caustic_Design_UIS
 	caustic.ui
 	dialog.ui
 	)
-QT4_WRAP_UI(UIS ${Caustic_Design_UIS})
+qt5_wrap_ui(UIS ${Caustic_Design_UIS})
 
 set ( Caustic_Design_MOCS
 	dialog.h
 	glviewer.h
 	window.h
 	)
-QT4_WRAP_CPP(MOCS ${Caustic_Design_MOCS})
+qt5_wrap_cpp(MOCS ${Caustic_Design_MOCS})
 
 add_executable ( Caustic_Design ${Caustic_Design_SRCS} ${UIS} ${RSCS} ${TRS} ${MOCS} )
 
-target_link_libraries ( Caustic_Design  ${QT_QTCORE_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTOPENGL_LIBRARY} ${OPENGL_LIBRARIES} ${GLU_LIBRARY} ${CGAL_FLAGS} ${LBFGS_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${TinyXML_LIBRARIES})
+target_link_libraries ( Caustic_Design  
+	Qt5::Core 
+	Qt5::Gui 
+	Qt5::OpenGL 
+	Qt5::Widgets
+	${OPENGL_LIBRARIES} 
+	${GLU_LIBRARY} 
+	${CGAL_FLAGS} 
+	${LBFGS_LIBRARIES} 
+	${SUITESPARSE_LIBRARIES} 
+	${TinyXML_LIBRARIES})

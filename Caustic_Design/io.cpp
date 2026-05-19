@@ -178,8 +178,11 @@ void Scene::load_singularities(const QString& filename, std::vector<PointSingula
 
 void Scene::save_points(const QString& filename) const
 {
-    std::vector<Point> points;
-    collect_visible_points(points);
+    // std::vector<Point> points;
+    // collect_visible_points(points);
+    std::vector<Point> points = std::vector<Point>();
+    std::vector<FT> weights = std::vector<FT>();
+    collect_sites(points, weights);
     
     if (filename.contains(".dat", Qt::CaseInsensitive))
     {
@@ -215,6 +218,11 @@ void Scene::save_weights(const QString& filename) const
     {
         ofs << weights[i] << std::endl;
     }
+    // 四个角四个dummy point的权重为0
+    ofs << 0 << std::endl;
+    ofs << 0 << std::endl;
+    ofs << 0 << std::endl;
+    ofs << 0 << std::endl;
     ofs.close();
 }
 
@@ -227,6 +235,11 @@ void Scene::save_dat(const QString& filename, const std::vector<Point>& points) 
     {
         ofs << points[i] << std::endl;
     }
+    // 四个角添加四个 dummy point
+    ofs << Point(1000,1000) << std::endl;
+    ofs << Point(-1000,1000) << std::endl;
+    ofs << Point(1000,-1000) << std::endl;
+    ofs << Point(-1000,-1000) << std::endl;
     ofs.close();
 }
 

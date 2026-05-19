@@ -16,3 +16,6 @@
 
 *.dat
 *.weight
+*.png
+*.obj
+*.verts
